@@ -9,8 +9,10 @@ from rich.table import Table
 
 from ..config import Config
 from ..db import connect
+from ..geo.geocode import Geocoder
 from .manual import ListingDraft, add_listing
 from .osm import DEFAULT_RADII, OverpassClient, store_pois
+from .poi import POIDraft, add_manual_poi
 
 ingest_app = typer.Typer(no_args_is_help=True, help="物件データの取り込み")
 console = Console()
@@ -147,6 +149,40 @@ def list_cmd(
             f"{r['walk_min']}分" if r["walk_min"] else "-",
         )
     console.print(table)
+
+
+@ingest_app.command("poi-add")
+def poi_add_cmd(
+    listing_id: int = typer.Option(..., "--listing-id", "-l"),
+    kind: str = typer.Option(..., "--kind", help="super/gym/busstop/station/..."),
+    name: str = typer.Option(..., "--name"),
+    address: str = typer.Option(..., "--address", help="POI の住所（ジオコードして距離算出）"),
+    brand: str = typer.Option(None, "--brand"),
+    note: str = typer.Option(None, "--note"),
+) -> None:
+    """OSM 未登録のPOIを手動追加（osm_type='manual' で保存され OSM 再取得で消えない）。"""
+    cfg = Config.load()
+    if not cfg.db_path.exists():
+        console.print("[red]DB が初期化されていません。[/]")
+        raise typer.Exit(code=1)
+
+    conn = connect(cfg)
+    geocoder = Geocoder(conn=conn, config=cfg)
+    try:
+        draft = POIDraft(kind=kind, name=name, address=address, brand=brand, note=note)
+        try:
+            poi_id, geo, distance = add_manual_poi(conn, listing_id, draft, geocoder=geocoder)
+        except ValueError as e:
+            console.print(f"[red]✗ {e}[/]")
+            raise typer.Exit(code=1)
+        from ..utils.distance import walk_minutes
+        console.print(
+            f"[green]✓[/] POI id={poi_id} を追加: {name} "
+            f"({geo.lat:.5f}, {geo.lon:.5f}) → 物件まで {int(distance)}m / 徒歩{walk_minutes(distance)}分"
+        )
+    finally:
+        geocoder.close()
+        conn.close()
 
 
 @ingest_app.command("osm")

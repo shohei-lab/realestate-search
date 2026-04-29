@@ -204,9 +204,13 @@ def store_pois(
     location_id: int,
     pois: Iterable[POIFetched],
 ) -> int:
-    """指定 location の poi を入れ替え保存。返り値は登録件数。"""
+    """指定 location の OSM 由来 poi を入れ替え保存。手動POIは温存。返り値は登録件数。"""
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    conn.execute("DELETE FROM poi WHERE location_id = ?", (location_id,))
+    # osm_type が 'node'/'way'/'relation' のものだけ削除し、'manual' は保護する。
+    conn.execute(
+        "DELETE FROM poi WHERE location_id = ? AND osm_type IN ('node','way','relation')",
+        (location_id,),
+    )
     rows = [
         (
             location_id,

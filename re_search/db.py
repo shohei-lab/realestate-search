@@ -52,6 +52,32 @@ def _apply_migrations(conn: sqlite3.Connection) -> None:
     if bumped:
         conn.execute("INSERT OR IGNORE INTO schema_version(version) VALUES (2)")
 
+    # v3: score.kind の CHECK 制約に 'heritage' を追加
+    # SQLite は CHECK の ALTER をサポートしないので、テーブル再作成パターンを使う。
+    cur = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='score'"
+    )
+    row = cur.fetchone()
+    if row and "heritage" not in (row[0] or ""):
+        conn.executescript(
+            """
+            PRAGMA foreign_keys=OFF;
+            CREATE TABLE score_new (
+              listing_id INTEGER NOT NULL REFERENCES listing(id) ON DELETE CASCADE,
+              kind TEXT NOT NULL CHECK(kind IN ('livability','locality','heritage','fengshui')),
+              value REAL,
+              breakdown_json TEXT,
+              scored_at TEXT,
+              PRIMARY KEY(listing_id, kind)
+            );
+            INSERT INTO score_new SELECT * FROM score;
+            DROP TABLE score;
+            ALTER TABLE score_new RENAME TO score;
+            PRAGMA foreign_keys=ON;
+            """
+        )
+        conn.execute("INSERT OR IGNORE INTO schema_version(version) VALUES (3)")
+
 
 def get_schema_version(conn: sqlite3.Connection) -> int | None:
     cur = conn.execute(

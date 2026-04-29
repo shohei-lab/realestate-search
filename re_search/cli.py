@@ -97,9 +97,17 @@ def info() -> None:
 #   ... etc
 from .geo.cli import geo_app
 from .ingest.cli import ingest_app
+from .redev.cli import redev_app
+from .heritage.cli import heritage_app
+from .fengshui.cli import fengshui_app
+from .score.cli import score_app
 
 app.add_typer(geo_app, name="geo")
 app.add_typer(ingest_app, name="ingest")
+app.add_typer(redev_app, name="redev")
+app.add_typer(heritage_app, name="heritage")
+app.add_typer(fengshui_app, name="fengshui")
+app.add_typer(score_app, name="score")
 
 if __name__ == "__main__":
     app()

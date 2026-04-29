@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS listing_redev (
 
 CREATE TABLE IF NOT EXISTS score (
   listing_id INTEGER NOT NULL REFERENCES listing(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK(kind IN ('livability','locality','fengshui')),
+  kind TEXT NOT NULL CHECK(kind IN ('livability','locality','heritage','fengshui')),
   value REAL,
   breakdown_json TEXT,
   scored_at TEXT,
