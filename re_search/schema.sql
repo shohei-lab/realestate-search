@@ -105,10 +105,14 @@ CREATE TABLE IF NOT EXISTS poi (
   id INTEGER PRIMARY KEY,
   location_id INTEGER REFERENCES location(id) ON DELETE CASCADE,
   kind TEXT NOT NULL,         -- super/gym/busstop/station/...
+  name TEXT,
   brand TEXT,
   distance_m REAL,
   lat REAL,
-  lon REAL
+  lon REAL,
+  osm_type TEXT,
+  osm_id INTEGER,
+  fetched_at TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_poi_location ON poi(location_id);

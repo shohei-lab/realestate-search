@@ -23,10 +23,34 @@ def connect(config: Config) -> sqlite3.Connection:
 
 
 def init_schema(conn: sqlite3.Connection) -> None:
-    """schema.sql を流し込んでテーブル群を作る（IF NOT EXISTS なので再実行安全）。"""
+    """schema.sql を流し込んでテーブル群を作る（IF NOT EXISTS なので再実行安全）。
+
+    既存DBへの後方互換のため、軽量マイグレーションを最後に走らせる。
+    """
     sql = SCHEMA_FILE.read_text(encoding="utf-8")
     conn.executescript(sql)
+    _apply_migrations(conn)
     conn.commit()
+
+
+def _apply_migrations(conn: sqlite3.Connection) -> None:
+    """既存DBに対して列追加など差分マイグレーションを適用する。"""
+    # v2: poi.name / osm_type / osm_id / fetched_at を追加
+    cur = conn.execute("PRAGMA table_info(poi)")
+    cols = {row[1] for row in cur.fetchall()}
+    new_cols = [
+        ("name", "TEXT"),
+        ("osm_type", "TEXT"),
+        ("osm_id", "INTEGER"),
+        ("fetched_at", "TEXT"),
+    ]
+    bumped = False
+    for name, typ in new_cols:
+        if name not in cols:
+            conn.execute(f"ALTER TABLE poi ADD COLUMN {name} {typ}")
+            bumped = True
+    if bumped:
+        conn.execute("INSERT OR IGNORE INTO schema_version(version) VALUES (2)")
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int | None:
