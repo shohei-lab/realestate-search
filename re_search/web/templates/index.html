@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}物件一覧 — re-search{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">物件一覧 <span class="text-stone-400 text-base font-normal">({{ listings|length }} 件)</span></h1>
+
+{% if not listings %}
+  <div class="bg-amber-50 border border-amber-200 rounded p-6 text-amber-900">
+    まだ物件は登録されていません。<br />
+    <code class="bg-amber-100 px-2 py-1 rounded">re ingest add ...</code> で登録してください。
+  </div>
+{% else %}
+<div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+  {% for l in listings %}
+  {% set s = scores.get(l.id, {}) %}
+  {% set p = poi_summary.get(l.id, {}) %}
+  <a href="/listing/{{ l.id }}" class="bg-white rounded-2xl shadow hover:shadow-xl transition border border-stone-200 overflow-hidden flex flex-col">
+    <div class="bg-gradient-to-br from-stone-800 to-stone-700 text-white px-5 py-4">
+      <div class="text-xs uppercase tracking-wider opacity-70">listing #{{ l.id }}</div>
+      <div class="text-lg font-bold leading-tight mt-1">{{ l.address }}</div>
+      <div class="text-xs opacity-80 mt-1">
+        {% if l.station %}🚉 {{ l.station }} {{ l.walk_min or '?' }}分{% endif %}
+        {% if l.building_year %} · 築{{ l.building_year }}年{% endif %}
+        {% if l.structure %} · {{ l.structure }}{% endif %}
+      </div>
+    </div>
+
+    <div class="p-5 flex-1 flex flex-col gap-4">
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        <div><span class="text-stone-400">家賃</span> <span class="font-bold">{{ l.rent_jpy|yen }}</span></div>
+        <div><span class="text-stone-400">間取り</span> {{ l.layout or '-' }}</div>
+        <div><span class="text-stone-400">面積</span> {{ l.area_m2 or '-' }}{% if l.area_m2 %}㎡{% endif %}</div>
+        <div><span class="text-stone-400">区</span> {{ l.ward or '-' }}</div>
+      </div>
+
+      {% if s %}
+      <div class="border-t border-stone-100 pt-3 space-y-2">
+        {% for kind, val in s.items() %}
+        <div>
+          <div class="flex items-center justify-between text-xs mb-0.5">
+            <span class="text-stone-500">{{ score_label.get(kind, kind) }}</span>
+            <span class="font-mono font-bold">{{ '%.0f'|format(val) }}</span>
+          </div>
+          <div class="h-1.5 bg-stone-100 rounded-full overflow-hidden">
+            <div class="score-bar h-full rounded-full
+              {% if kind == 'livability' %}bg-emerald-500{% elif kind == 'heritage' %}bg-amber-500{% elif kind == 'fengshui' %}bg-rose-500{% else %}bg-blue-500{% endif %}"
+              style="width: {{ val }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if p %}
+      <div class="text-xs text-stone-500 flex flex-wrap gap-2 mt-auto pt-2 border-t border-stone-100">
+        {% if 'super' in p %}<span>🛒 スーパー {{ p.super.n }}件 / 最寄り{{ p.super.nearest|intdistance }}</span>{% endif %}
+        {% if 'gym' in p %}<span>💪 ジム {{ p.gym.n }}件 / 最寄り{{ p.gym.nearest|intdistance }}</span>{% endif %}
+        {% if 'busstop' in p %}<span>🚌 バス停 {{ p.busstop.n }}件</span>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

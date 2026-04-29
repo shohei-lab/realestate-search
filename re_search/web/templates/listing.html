@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}{{ listing.address }} — re-search{% endblock %}
+
+{% block content %}
+<a href="/" class="text-sm text-stone-500 hover:underline">&larr; 物件一覧へ戻る</a>
+
+<div class="mt-2 mb-6">
+  <h1 class="text-3xl font-bold">{{ listing.source_name or listing.address }}</h1>
+  <div class="text-stone-500 mt-1">{{ listing.address }}</div>
+</div>
+
+<section class="grid lg:grid-cols-3 gap-6 mb-8">
+  <div class="lg:col-span-2 bg-white rounded-2xl border border-stone-200 shadow-sm p-6">
+    <h2 class="font-bold mb-4">スコア</h2>
+    {% if not scores %}
+      <p class="text-stone-400 text-sm">スコア未計算。<code class="bg-stone-100 px-1.5 py-0.5 rounded">re score compute -l {{ listing.id }}</code> を実行。</p>
+    {% else %}
+    <div class="grid sm:grid-cols-2 gap-5">
+      {% for kind, label in score_label.items() if kind in scores %}
+      {% set s = scores[kind] %}
+      <div>
+        <div class="flex items-baseline justify-between mb-1">
+          <span class="text-sm text-stone-500">{{ label }}</span>
+          <span class="font-mono text-2xl font-bold">{{ '%.0f'|format(s.value) }}<span class="text-stone-400 text-sm">/100</span></span>
+        </div>
+        <div class="h-2 bg-stone-100 rounded-full overflow-hidden">
+          <div class="score-bar h-full rounded-full
+              {% if kind == 'livability' %}bg-emerald-500{% elif kind == 'heritage' %}bg-amber-500{% elif kind == 'fengshui' %}bg-rose-500{% else %}bg-blue-500{% endif %}"
+              style="width: {{ s.value }}%"></div>
+        </div>
+        {% if s.breakdown.comment %}
+          <p class="text-xs text-stone-500 mt-1">{{ s.breakdown.comment }}</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-2xl border border-stone-200 shadow-sm p-6 text-sm">
+    <h2 class="font-bold mb-3">物件情報</h2>
+    <dl class="space-y-1.5">
+      <div class="flex justify-between"><dt class="text-stone-500">家賃</dt><dd class="font-bold">{{ listing.rent_jpy|yen }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">管理費</dt><dd>{{ listing.mgmt_fee_jpy|yen }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">間取り</dt><dd>{{ listing.layout or '-' }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">面積</dt><dd>{{ listing.area_m2 or '-' }}{% if listing.area_m2 %}㎡{% endif %}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">築年</dt><dd>{{ listing.building_year or '-' }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">構造</dt><dd>{{ listing.structure or '-' }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">耐震</dt><dd>{{ listing.earthquake_grade or '-' }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">総戸数</dt><dd>{{ listing.total_units or '-' }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">駅</dt><dd>{{ listing.station or '-' }} {{ listing.walk_min or '' }}{% if listing.walk_min %}分{% endif %}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">玄関方位</dt><dd>{{ listing.orientation or '-' }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">区</dt><dd>{{ listing.ward or '-' }} ({{ listing.town_code or '-' }})</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">地形</dt><dd>{{ listing.terrain_class or '-' }}</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section class="grid lg:grid-cols-3 gap-6 mb-8">
+  <div class="lg:col-span-2 bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+    <h2 class="font-bold p-4 pb-2">周辺地図</h2>
+    <div id="map" class="h-[480px] w-full" data-listing-id="{{ listing.id }}" data-lat="{{ listing.lat or 35.681236 }}" data-lon="{{ listing.lon or 139.767125 }}"></div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-stone-200 shadow-sm p-5 overflow-hidden">
+    <h2 class="font-bold mb-3">周辺施設</h2>
+    {% for kind, items in pois_by_kind.items() %}
+    {% set lab = kind_label.get(kind, ('📍', kind, '#999')) %}
+    <details {% if loop.first %}open{% endif %} class="mb-3">
+      <summary class="cursor-pointer font-medium text-sm flex items-center gap-2">
+        <span>{{ lab[0] }}</span>
+        <span>{{ lab[1] }} ({{ items|length }})</span>
+      </summary>
+      <ul class="mt-2 space-y-1 text-xs">
+        {% for p in items[:8] %}
+        <li class="flex justify-between gap-2 border-b border-stone-100 pb-1">
+          <span class="truncate">
+            {{ p.name or '?' }}
+            {% if p.osm_type == 'manual' %}<span class="text-blue-500 text-[10px]">[手動]</span>{% endif %}
+          </span>
+          <span class="text-stone-500 whitespace-nowrap">{{ p.distance_m|intdistance }} / {{ p.distance_m|walkmin }}分</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% else %}
+      <p class="text-xs text-stone-400">POI 未取得。<code>re ingest osm -l {{ listing.id }}</code></p>
+    {% endfor %}
+  </div>
+</section>
+
+{% if redev %}
+<section class="mb-8">
+  <h2 class="font-bold mb-3 flex items-center gap-2">🏗️ 再開発・建替プロジェクト</h2>
+  <div class="space-y-3">
+    {% for r in redev %}
+    <div class="bg-white rounded-xl border border-stone-200 p-5 shadow-sm">
+      <div class="flex items-start justify-between flex-wrap gap-2">
+        <div>
+          <h3 class="font-bold">{{ r.name }}</h3>
+          <div class="text-xs text-stone-500 mt-1 flex flex-wrap gap-x-3">
+            <span>種別: {{ r.kind }}</span>
+            <span>状態: <span class="font-medium">{{ r.status }}</span></span>
+            {% if r.expected_completion_year %}<span>竣工: {{ r.expected_completion_year }}年</span>{% endif %}
+            <span>確度: {{ r.confidence }}</span>
+            {% if r.confirmed_by_user %}<span class="text-emerald-600">✓ 確認済</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      {% if r.summary %}<p class="text-sm mt-3 text-stone-700">{{ r.summary }}</p>{% endif %}
+      {% if r.link_note %}<p class="text-xs mt-2 text-stone-500">物件との関係: {{ r.link_note }}</p>{% endif %}
+      {% if r.source_url %}<a href="{{ r.source_url }}" target="_blank" class="text-xs text-blue-600 hover:underline">出典: {{ r.source_name or r.source_url }}</a>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if heritage %}
+<section class="mb-8">
+  <h2 class="font-bold mb-3 flex items-center gap-2">🏯 沿革・古地名・古地形</h2>
+  <div class="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+    <ol class="divide-y divide-stone-100">
+      {% for h in heritage %}
+      <li class="p-4">
+        <div class="flex items-center gap-3 mb-1">
+          <span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-xs font-medium">{{ h.era }}</span>
+          {% if h.old_name %}<span class="font-bold">{{ h.old_name }}</span>{% endif %}
+        </div>
+        <div class="text-sm text-stone-600 space-y-0.5">
+          {% if h.old_use %}<div>用途: {{ h.old_use }}</div>{% endif %}
+          {% if h.old_terrain %}<div>地形: {{ h.old_terrain }}</div>{% endif %}
+          {% if h.note %}<div class="text-stone-500">備考: {{ h.note }}</div>{% endif %}
+          {% if h.citation %}<div class="text-xs text-stone-400">出典: {{ h.citation }}</div>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  {% if waterways %}
+  <div class="mt-3 text-xs text-stone-500">
+    周辺の暗渠・旧河道: {% for w in waterways %}<span class="bg-stone-100 px-2 py-0.5 rounded mr-1">{{ w.kind }}: {{ w.name or '?' }}</span>{% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if fengshui_evals %}
+<section class="mb-8">
+  <h2 class="font-bold mb-3 flex items-center gap-2">🧭 風水・地相評価</h2>
+  <div class="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-stone-50 text-xs uppercase text-stone-500">
+        <tr>
+          <th class="text-left p-3">ルール</th>
+          <th class="text-left p-3">判定</th>
+          <th class="text-right p-3">Δ</th>
+          <th class="text-left p-3">所見</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for e in fengshui_evals %}
+        <tr>
+          <td class="p-3 font-mono text-xs">{{ e.rule_id }}</td>
+          <td class="p-3 {% if e.verdict == '吉' %}verdict-good{% elif e.verdict == '凶' %}verdict-bad{% else %}verdict-neutral{% endif %} font-bold">{{ e.verdict }}</td>
+          <td class="p-3 text-right font-mono {% if e.score_delta > 0 %}verdict-good{% elif e.score_delta < 0 %}verdict-bad{% endif %}">{{ '%+.0f'|format(e.score_delta) }}</td>
+          <td class="p-3 text-stone-600">{{ e.note }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-stone-400 mt-2">※ 風水スコアは「好みの定量化」位置づけ。観察可能な事実（地形・道路・川・方位）に基づくルールベース評価。</p>
+</section>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function() {
+  const mapEl = document.getElementById('map');
+  if (!mapEl) return;
+  const lat = parseFloat(mapEl.dataset.lat);
+  const lon = parseFloat(mapEl.dataset.lon);
+  const listingId = mapEl.dataset.listingId;
+
+  const map = L.map('map').setView([lat, lon], 16);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  }).addTo(map);
+
+  const homeIcon = L.divIcon({
+    html: '<div style="background:#dc2626;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 0 4px rgba(0,0,0,0.5);font-size:16px;">🏠</div>',
+    className: '',
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  });
+  L.marker([lat, lon], {icon: homeIcon}).addTo(map).bindPopup('<b>物件</b>');
+
+  const KIND_STYLE = {
+    super:   {emoji: '🛒', color: '#22c55e'},
+    gym:     {emoji: '💪', color: '#a855f7'},
+    busstop: {emoji: '🚌', color: '#3b82f6'},
+    station: {emoji: '🚉', color: '#ef4444'},
+  };
+  fetch('/api/listing/' + listingId + '/pois.json')
+    .then(r => r.json())
+    .then(d => {
+      d.pois.forEach(p => {
+        const style = KIND_STYLE[p.kind] || {emoji: '📍', color: '#999'};
+        const icon = L.divIcon({
+          html: '<div style="background:'+style.color+';color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 0 3px rgba(0,0,0,0.4);font-size:13px;">'+style.emoji+'</div>',
+          className: '',
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+        });
+        const popup = '<b>' + (p.name || '?') + '</b><br/>' +
+                      (p.brand ? p.brand + '<br/>' : '') +
+                      Math.round(p.distance_m) + 'm / 徒歩' + Math.ceil(p.distance_m / 80) + '分' +
+                      (p.osm_type === 'manual' ? '<br/><span style="color:#3b82f6;font-size:10px">[手動追加]</span>' : '');
+        L.marker([p.lat, p.lon], {icon: icon}).addTo(map).bindPopup(popup);
+      });
+    });
+})();
+</script>
+{% endblock %}

@@ -109,5 +109,35 @@ app.add_typer(heritage_app, name="heritage")
 app.add_typer(fengshui_app, name="fengshui")
 app.add_typer(score_app, name="score")
 
+
+@app.command()
+def web(
+    host: str = typer.Option("127.0.0.1", "--host"),
+    port: int = typer.Option(8765, "--port"),
+    reload: bool = typer.Option(False, "--reload", help="開発時のホットリロード"),
+) -> None:
+    """WebUI を起動する（FastAPI + Uvicorn）。"""
+    cfg = Config.load()
+    if not cfg.db_path.exists():
+        console.print("[red]DB が初期化されていません。[/] 先に [bold]re init[/]")
+        raise typer.Exit(code=1)
+    try:
+        import uvicorn  # noqa: F401
+    except ImportError:
+        console.print("[red]WebUI 依存が未インストールです。[/]")
+        console.print("  [bold]pip install -e \".[dev]\"[/] で fastapi/uvicorn/jinja2 を入れてください。")
+        raise typer.Exit(code=1)
+    console.print(f"[green]Starting WebUI:[/] [bold]http://{host}:{port}[/]")
+    console.print("  Ctrl+C で停止")
+    import uvicorn
+    uvicorn.run(
+        "re_search.web.app:app",
+        host=host,
+        port=port,
+        reload=reload,
+        log_level="info",
+    )
+
+
 if __name__ == "__main__":
     app()
