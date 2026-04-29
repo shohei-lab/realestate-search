@@ -95,6 +95,11 @@ def info() -> None:
 #   from .search.cli import search_app
 #   app.add_typer(search_app, name="search")
 #   ... etc
+from .geo.cli import geo_app
+from .ingest.cli import ingest_app
+
+app.add_typer(geo_app, name="geo")
+app.add_typer(ingest_app, name="ingest")
 
 if __name__ == "__main__":
     app()
